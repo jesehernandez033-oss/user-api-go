@@ -40,7 +40,7 @@ func GenerateToken() string {
 	return signedToken
 }
 
-func validateToken(authorizationToken string) (string, error) {
+func ValidateToken(authorizationToken string) (string, error) {
 	//r.Header.Get("Authorization")
 	receivedToken := strings.Replace(authorizationToken, "Bearer ", "", -1)
 

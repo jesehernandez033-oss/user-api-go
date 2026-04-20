@@ -3,14 +3,16 @@ services:
   app:
     image: golang:bullseye
     ports:
-      - "8181:8181"
+      - "8080:8080"
+    volumes:
+      - .:/app
+    working_dir: /app
     command: go run main.go
 
-  postgres:
-    image: postgres:14.3
-    ports:
-      - "5432"
+  mysql:
+    image: mysql:8
     environment:
-      POSTGRES_USER: "root"
-      POSTGRES_PASSWORD: "root"
-      POSTGRES_DB: "api_users"
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: api_users
+    ports:
+      - "3306:3306"

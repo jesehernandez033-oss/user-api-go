@@ -1,45 +1,253 @@
-# API Exercise
+# 🚀 User Management API (Go)
 
-We have an API proposal for make the management of users of a database. In order 
-to do that we need to satisfy 3 possible scenarios:
+API REST desarrollada en Go para la gestión de usuarios, con autenticación JWT, validaciones de negocio y conexión a base de datos SQL Server.
 
-### Requirements:
-- Create new users: we need to receive as user data the next fields:
-  ```
-    - name --> mandatory
-    - email_address --> mandatory, is unique
-    - phone_number
-    - date_of_birth
-    - encrypted_password --> mandatory
-    - address
-  ```
-- Update existing users: we receive the data of user to update identified by email 
-- Delete users: user identified by email, and we need to deleted in a clear way
-- All users must have all the data validated which means:
-  ```
-  - if have phone number is provide we need to verify that is a valid number
-  - the user need to be older than 14 years
-  - the password must be between 8 and 16 characters, must contain at least
-  one capital letter, a number and a special character 
-  ```
+---
 
-### The considerations for the exercises are:
-- You can use the database service of docker-compose as a manual test,
-but you need to do the automated tests 
+## 📌 Características
 
-- The database schema are not designed yet, so choose a design that fits with the requirements
-and the data stored
+* 🔐 Autenticación con JWT
+* 👤 Crear, actualizar y eliminar usuarios
+* ✅ Validaciones:
 
-- The application have to be well tested in order to cover all
-edge cases and not only the happy path
+  * Campos obligatorios
+  * Contraseña segura
+  * Edad mínima (14 años)
+  * Email único
+* 🗄️ Conexión a base de datos SQL Server
+* 🧪 Probado con Postman
 
-- We need something simple but scalable
+---
 
-- Well constructed architecture, remember to separate each responsibility where it belongs.
-You can use the next image as guide
+## 🧱 Arquitectura
 
-<img src="docs/clean_architecture.png" alt="drawing" width="500"/>
+El proyecto sigue una estructura simple inspirada en Clean Architecture:
 
-### Run application
-You can build and run the application with the Makefile provided, that have the commands
-for build, run and test
+```
+/application
+    /controllers   → Manejo de endpoints
+/application
+    token.go       → Lógica de JWT
+/infrastructure
+    db.go          → Conexión a base de datos
+main.go            → Entry point
+```
+
+---
+
+## ⚙️ Requisitos
+
+* Go 1.18+
+* SQL Server
+* Postman (para pruebas)
+
+---
+
+## ▶️ Cómo ejecutar el proyecto
+
+### 1. Clonar repositorio
+
+```bash
+git clone <repo-url>
+cd <project-folder>
+```
+
+---
+
+### 2. Configurar base de datos
+
+Crear base de datos:
+
+```sql
+CREATE DATABASE api_users;
+```
+
+Tabla:
+
+```sql
+CREATE TABLE users (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    username VARCHAR(100),
+    email VARCHAR(100) UNIQUE,
+    password VARCHAR(100),
+    phone_number VARCHAR(20),
+    birthday DATE,
+    address VARCHAR(255)
+);
+```
+
+---
+
+### 3. Configurar conexión
+
+En `infrastructure/db.go`:
+
+```go
+connString := "sqlserver://localhost?database=api_users&trusted_connection=yes&encrypt=disable"
+```
+
+---
+
+### 4. Ejecutar API
+
+```bash
+go run main.go
+```
+
+Servidor corriendo en:
+
+```text
+http://localhost:8080
+```
+
+---
+
+## 🔐 Autenticación
+
+### Login
+
+```http
+POST /login
+```
+
+Respuesta:
+
+```json
+{
+  "Message": "loginSuccesful",
+  "AccessToken": "TOKEN"
+}
+```
+
+---
+
+### Uso del token
+
+En los endpoints protegidos:
+
+```http
+Authorization: Bearer TU_TOKEN
+```
+
+---
+
+## 📡 Endpoints
+
+---
+
+### 🟢 Health Check
+
+```http
+GET /ping
+```
+
+Respuesta:
+
+```
+pong
+```
+
+---
+
+### 🟢 Crear usuario
+
+```http
+POST /createUser
+```
+
+Body:
+
+```json
+{
+  "username": "jese",
+  "email": "test@test.com",
+  "password": "Password1!",
+  "phone_number": "8091234567",
+  "birthday": "2000-01-01",
+  "address": "Santo Domingo"
+}
+```
+
+---
+
+### 🟡 Actualizar usuario
+
+```http
+PUT /updateUser
+```
+
+Body:
+
+```json
+{
+  "email": "test@test.com",
+  "username": "nuevo",
+  "password": "Password1!",
+  "phone_number": "8099999999",
+  "birthday": "2000-01-01",
+  "address": "Nueva direccion"
+}
+```
+
+---
+
+### 🔴 Eliminar usuario
+
+```http
+DELETE /deleteUser?email=test@test.com
+```
+
+---
+
+## ✅ Validaciones implementadas
+
+* Username, email y password obligatorios
+* Password:
+
+  * 8-16 caracteres
+  * Al menos 1 mayúscula
+  * 1 número
+  * 1 carácter especial
+* Edad mínima: 14 años
+* Email único en base de datos
+* Formato de fecha: `YYYY-MM-DD`
+
+---
+
+## ❌ Manejo de errores
+
+| Código | Descripción           |
+| ------ | --------------------- |
+| 400    | Datos inválidos       |
+| 401    | Token inválido        |
+| 404    | Usuario no encontrado |
+| 500    | Error interno         |
+
+---
+
+## 🧪 Pruebas
+
+Se realizaron pruebas con:
+
+* Datos válidos
+* Password inválido
+* Usuario menor de edad
+* Email duplicado
+* Token inválido o ausente
+
+---
+
+## 🚀 Mejoras futuras
+
+* 🔐 Encriptar contraseñas con bcrypt
+* 🧱 Separar capas (services, repositories)
+* 🧪 Tests automatizados más completos
+* 🐳 Docker completo con DB integrada
+
+---
+
+## 👨‍💻 Autor
+
+Proyecto desarrollado como ejercicio técnico de API en Go.
+
+---
