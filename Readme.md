@@ -255,5 +255,4 @@ Jesé Hernández
 
 
 
-Si quieres, el siguiente nivel sería:
-👉 dejarlo **presentable para CV/LinkedIn (nivel reclutador)** 😏
+
