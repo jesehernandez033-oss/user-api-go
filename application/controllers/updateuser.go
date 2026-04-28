@@ -1,32 +1,40 @@
 package controllers
 
 import (
+	"awesomeProject1/domain"
 	"awesomeProject1/infrastructure"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"time"
+	"strings"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
-// Usa el mismo struct UserCredentials y la función isValidPassword
-// que ya definiste en create_user.go
-
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
-	var user UserCredentials
+	var user domain.User
 
 	// 1. Leer JSON
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=UpdateUser | error=invalid JSON | err=%v",
+			err,
+		)
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// 2. Email obligatorio (identificador)
+	// 2. Email obligatorio
 	if user.Email == "" {
-		http.Error(w, "email is required to update user", 400)
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=UpdateUser | missing email",
+		)
+		http.Error(w, "email is required to update user", http.StatusBadRequest)
 		return
 	}
 
-	// 3. Verificar que el usuario existe
+	// 3. Verificar existencia
 	var exists int
 	err = infrastructure.DB.QueryRow(
 		"SELECT COUNT(*) FROM users WHERE email = @p1",
@@ -34,63 +42,145 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	).Scan(&exists)
 
 	if err != nil {
-		http.Error(w, "error checking user", 500)
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=UpdateUser | email=%s | db_error=%v",
+			user.Email,
+			err,
+		)
+		http.Error(w, "error checking user", http.StatusInternalServerError)
 		return
 	}
 
 	if exists == 0 {
-		http.Error(w, "user not found", 404)
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=UpdateUser | user not found | email=%s",
+			user.Email,
+		)
+		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
 
-	// 4. Validaciones (solo si vienen datos)
+	// 4. Validaciones
 
-	// Password
+	if user.Email != "" && !user.IsValidEmail() {
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=UpdateUser | invalid email format | email=%s",
+			user.Email,
+		)
+		http.Error(w, "invalid email format", http.StatusBadRequest)
+		return
+	}
+
 	if user.Password != "" {
-		if !isValidPassword(user.Password) {
-			http.Error(w, "password must be 8-16 chars, include uppercase, number and special character", 400)
+		if !user.IsValidPassword() {
+			infrastructure.Logger.Printf(
+				"WARNING | endpoint=UpdateUser | weak password | email=%s",
+				user.Email,
+			)
+			http.Error(w, "invalid password", http.StatusBadRequest)
 			return
 		}
-	}
 
-	// Edad
-	if user.Birthday != "" {
-		birthDate, err := time.Parse("2006-01-02", user.Birthday)
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 		if err != nil {
-			http.Error(w, "invalid date format (use YYYY-MM-DD)", 400)
+			infrastructure.Logger.Printf(
+				"ERROR | endpoint=UpdateUser | email=%s | bcrypt_error=%v",
+				user.Email,
+				err,
+			)
+			http.Error(w, "error encrypting password", http.StatusInternalServerError)
 			return
 		}
+		user.Password = string(hashedPassword)
+	}
 
-		age := time.Now().Year() - birthDate.Year()
-		if age < 14 {
-			http.Error(w, "user must be older than 14", 400)
+	if user.Birthday != "" {
+		if !user.IsAdult() {
+			infrastructure.Logger.Printf(
+				"WARNING | endpoint=UpdateUser | underage update attempt | email=%s",
+				user.Email,
+			)
+			http.Error(w, "user must be older than 14", http.StatusBadRequest)
 			return
 		}
 	}
 
-	// 5. Actualizar en DB
-	_, err = infrastructure.DB.Exec(
-		`UPDATE users SET 
-		 username = @p1,
-		 password = @p2,
-		 phone_number = @p3,
-		 birthday = @p4,
-		 address = @p5
-		 WHERE email = @p6`,
-		user.UserName,
-		user.Password,
-		user.PhoneNumber,
-		user.Birthday,
-		user.Address,
+	// 🔥 5. QUERY DINÁMICA
+	query := "UPDATE users SET "
+	params := []interface{}{}
+	i := 1
+
+	updatedFields := []string{} // 👈 para logging
+
+	if user.UserName != "" {
+		query += "username = @p" + fmt.Sprint(i) + ", "
+		params = append(params, user.UserName)
+		updatedFields = append(updatedFields, "username")
+		i++
+	}
+
+	if user.Password != "" {
+		query += "password = @p" + fmt.Sprint(i) + ", "
+		params = append(params, user.Password)
+		updatedFields = append(updatedFields, "password")
+		i++
+	}
+
+	if user.PhoneNumber != "" {
+		query += "phone_number = @p" + fmt.Sprint(i) + ", "
+		params = append(params, user.PhoneNumber)
+		updatedFields = append(updatedFields, "phone_number")
+		i++
+	}
+
+	if user.Birthday != "" {
+		query += "birthday = @p" + fmt.Sprint(i) + ", "
+		params = append(params, user.Birthday)
+		updatedFields = append(updatedFields, "birthday")
+		i++
+	}
+
+	if user.Address != "" {
+		query += "address = @p" + fmt.Sprint(i) + ", "
+		params = append(params, user.Address)
+		updatedFields = append(updatedFields, "address")
+		i++
+	}
+
+	// ⚠️ evitar update vacío
+	if len(params) == 0 {
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=UpdateUser | no fields to update | email=%s",
+			user.Email,
+		)
+		http.Error(w, "no fields to update", http.StatusBadRequest)
+		return
+	}
+
+	query = strings.TrimSuffix(query, ", ")
+	query += " WHERE email = @p" + fmt.Sprint(i)
+	params = append(params, user.Email)
+
+	// ejecutar
+	_, err = infrastructure.DB.Exec(query, params...)
+	if err != nil {
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=UpdateUser | email=%s | update_error=%v",
+			user.Email,
+			err,
+		)
+		http.Error(w, "error updating user", http.StatusInternalServerError)
+		return
+	}
+
+	// 🟢 Log de éxito (sin datos sensibles)
+	infrastructure.Logger.Printf(
+		"INFO | user updated | email=%s | fields=%v",
 		user.Email,
+		updatedFields,
 	)
 
-	if err != nil {
-		http.Error(w, "error updating user", 500)
-		return
-	}
-
-	// 6. Respuesta JSON
+	// 6. respuesta
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "user updated successfully",

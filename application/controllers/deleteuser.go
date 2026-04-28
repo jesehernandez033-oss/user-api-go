@@ -6,45 +6,81 @@ import (
 	"net/http"
 )
 
+type DeleteRequest struct {
+	Email string `json:"email"`
+}
+
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
+	var req DeleteRequest
 
-	// 1. Obtener email desde query param
-	email := r.URL.Query().Get("email")
-
-	if email == "" {
-		http.Error(w, "email is required", 400)
+	// 1. Leer JSON
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=DeleteUser | error=invalid JSON | err=%v",
+			err,
+		)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// 2. Verificar si el usuario existe
+	if req.Email == "" {
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=DeleteUser | missing email",
+		)
+		http.Error(w, "email is required", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Verificar existencia
 	var exists int
-	err := infrastructure.DB.QueryRow(
+	err = infrastructure.DB.QueryRow(
 		"SELECT COUNT(*) FROM users WHERE email = @p1",
-		email,
+		req.Email,
 	).Scan(&exists)
 
 	if err != nil {
-		http.Error(w, "error checking user", 500)
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=DeleteUser | email=%s | db_error=%v",
+			req.Email,
+			err,
+		)
+		http.Error(w, "error checking user", http.StatusInternalServerError)
 		return
 	}
 
 	if exists == 0 {
-		http.Error(w, "user not found", 404)
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=DeleteUser | user not found | email=%s",
+			req.Email,
+		)
+		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
 
-	// 3. Eliminar usuario
+	// 3. Eliminar
 	_, err = infrastructure.DB.Exec(
 		"DELETE FROM users WHERE email = @p1",
-		email,
+		req.Email,
 	)
 
 	if err != nil {
-		http.Error(w, "error deleting user", 500)
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=DeleteUser | email=%s | delete_error=%v",
+			req.Email,
+			err,
+		)
+		http.Error(w, "error deleting user", http.StatusInternalServerError)
 		return
 	}
 
-	// 4. Respuesta JSON
+	// 🟢 Log de éxito
+	infrastructure.Logger.Printf(
+		"INFO | user deleted | email=%s",
+		req.Email,
+	)
+
+	// 4. Respuesta
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "user deleted successfully",

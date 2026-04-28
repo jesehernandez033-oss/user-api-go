@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"database/sql"
 	"log"
+	"os"
 
 	_ "github.com/denisenkom/go-mssqldb"
 )
@@ -10,7 +11,13 @@ import (
 var DB *sql.DB
 
 func ConnectDB() {
-	connString := "sqlserver://localhost:1433?database=api_users&trusted_connection=yes"
+	// 🔐 Leer conexión desde variable de entorno
+	connString := os.Getenv("DB_CONN")
+
+	if connString == "" {
+		log.Fatal("DB_CONN not set")
+	}
+
 	db, err := sql.Open("sqlserver", connString)
 	if err != nil {
 		log.Fatal(err)
