@@ -9,6 +9,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// CreateUser godoc
+// @Summary Crear usuario
+// @Description Crea un nuevo usuario con validaciones y contraseña encriptada
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param user body domain.User true "Datos del usuario"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string "Bad request"
+// @Failure 500 {string} string "Internal server error"
+// @Router /createUser [post]
 func CreateUser(w http.ResponseWriter, r *http.Request) {
 	var user domain.User
 
@@ -98,8 +109,6 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error encrypting password", http.StatusInternalServerError)
 		return
 	}
-
-	
 
 	// 4. Insertar en DB
 	_, err = infrastructure.DB.Exec(

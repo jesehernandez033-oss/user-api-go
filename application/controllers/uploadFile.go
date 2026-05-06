@@ -8,6 +8,17 @@ import (
 	"os"
 )
 
+// UploadFile godoc
+// @Summary Subir archivo
+// @Description Sube un archivo al servidor
+// @Tags Files
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "Archivo a subir"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string "Bad request"
+// @Failure 500 {string} string "Internal server error"
+// @Router /uploadFile [post]
 func UploadFile(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseMultipartForm(10 << 20) // 10MB
 	if err != nil {

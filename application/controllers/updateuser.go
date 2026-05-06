@@ -11,6 +11,20 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// UpdateUser godoc
+// @Summary Actualizar usuario
+// @Description Actualiza parcialmente un usuario. Requiere JWT.
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param user body domain.User true "Datos a actualizar"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string "Bad request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router /updateUser [put]
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	var user domain.User
 

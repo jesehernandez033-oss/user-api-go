@@ -51,6 +51,18 @@ func isBlocked(ip string) bool {
 	return false
 }
 
+// Login godoc
+// @Summary Iniciar sesión
+// @Description Valida credenciales y devuelve un token JWT
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param credentials body LoginRequest true "Credenciales"
+// @Success 200 {object} ResponseToken
+// @Failure 400 {string} string "Bad request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 429 {string} string "Too many requests"
+// @Router /login [post]
 func Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 

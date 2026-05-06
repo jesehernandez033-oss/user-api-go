@@ -10,6 +10,20 @@ type DeleteRequest struct {
 	Email string `json:"email"`
 }
 
+// DeleteUser godoc
+// @Summary Eliminar usuario
+// @Description Elimina un usuario por email. Requiere JWT.
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body DeleteRequest true "Email del usuario"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string "Bad request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router /deleteUser [delete]
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	var req DeleteRequest
 
