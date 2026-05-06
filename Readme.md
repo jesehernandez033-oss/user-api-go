@@ -1,8 +1,4 @@
-Listo. Este es tu **README completo, limpio y profesional**, con uso incluido. Solo cópialo y pégalo en `README.md`:
 
----
-
-```md
 # User API Go - Version 2.0
 
 API REST desarrollada en Go para la gestión de usuarios con autenticación JWT, validaciones de seguridad y arquitectura limpia.
