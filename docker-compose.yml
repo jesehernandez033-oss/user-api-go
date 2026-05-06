@@ -1,18 +1,29 @@
-version: "3"
+version: "3.8"
+
 services:
-  app:
-    image: golang:bullseye
+  api:
+    build: .
+    container_name: user_api_go
     ports:
       - "8080:8080"
-    volumes:
-      - .:/app
-    working_dir: /app
-    command: go run main.go
-
-  mysql:
-    image: mysql:8
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: api_users
+      PORT: "8080"
+      JWT_SECRET: "Papasalafrancesa04_super_secret_2026"
+      ALLOWED_ORIGIN: "http://localhost:3000"
+      DB_CONN: "sqlserver://sa:YourStrong!Passw0rd@sqlserver:1433?database=api_users&encrypt=disable"
+    depends_on:
+      - sqlserver
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver_api_users
     ports:
-      - "3306:3306"
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "YourStrong!Passw0rd"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+volumes:
+  sqlserver_data:

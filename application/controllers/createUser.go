@@ -1,82 +1,78 @@
 package controllers
 
 import (
+	"awesomeProject1/domain"
 	"awesomeProject1/infrastructure"
 	"encoding/json"
 	"net/http"
-	"time"
-	"unicode"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
-type UserCredentials struct {
-	UserName    string `json:"username"`
-	Password    string `json:"password"`
-	Email       string `json:"email"`
-	PhoneNumber string `json:"phone_number"`
-	Birthday    string `json:"birthday"`
-	Address     string `json:"address"`
-}
-
-// 🔐 Validación de password SIN regex complejo
-func isValidPassword(password string) bool {
-	if len(password) < 8 || len(password) > 16 {
-		return false
-	}
-
-	var hasUpper, hasNumber, hasSpecial bool
-
-	for _, char := range password {
-		switch {
-		case unicode.IsUpper(char):
-			hasUpper = true
-		case unicode.IsDigit(char):
-			hasNumber = true
-		case !unicode.IsLetter(char) && !unicode.IsDigit(char):
-			hasSpecial = true
-		}
-	}
-
-	return hasUpper && hasNumber && hasSpecial
-}
-
+// CreateUser godoc
+// @Summary Crear usuario
+// @Description Crea un nuevo usuario con validaciones y contraseña encriptada
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Param user body domain.User true "Datos del usuario"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string "Bad request"
+// @Failure 500 {string} string "Internal server error"
+// @Router /createUser [post]
 func CreateUser(w http.ResponseWriter, r *http.Request) {
-	var user UserCredentials
+	var user domain.User
 
 	// 1. Leer JSON
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=CreateUser | error=invalid JSON | err=%v",
+			err,
+		)
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// 2. Validaciones
-
-	// Campos obligatorios
+	// 2. Validaciones básicas
 	if user.UserName == "" || user.Email == "" || user.Password == "" {
-		http.Error(w, "username, email and password are required", 400)
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=CreateUser | missing required fields | email=%s",
+			user.Email,
+		)
+		http.Error(w, "username, email and password are required", http.StatusBadRequest)
 		return
 	}
 
-	// Password válida
-	if !isValidPassword(user.Password) {
-		http.Error(w, "password must be 8-16 chars, include uppercase, number and special character", 400)
+	// 📧 Validaciones DOMAIN
+	if !user.IsValidEmail() {
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=CreateUser | invalid email format | email=%s",
+			user.Email,
+		)
+		http.Error(w, "invalid email format", http.StatusBadRequest)
 		return
 	}
 
-	// Validar fecha y edad
-	birthDate, err := time.Parse("2006-01-02", user.Birthday)
-	if err != nil {
-		http.Error(w, "invalid date format (use YYYY-MM-DD)", 400)
+	if !user.IsValidPassword() {
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=CreateUser | weak password | email=%s",
+			user.Email,
+		)
+		http.Error(w, "invalid password", http.StatusBadRequest)
 		return
 	}
 
-	age := time.Now().Year() - birthDate.Year()
-	if age < 14 {
-		http.Error(w, "user must be older than 14", 400)
+	if !user.IsAdult() {
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=CreateUser | underage user | email=%s",
+			user.Email,
+		)
+		http.Error(w, "user must be older than 14", http.StatusBadRequest)
 		return
 	}
 
-	// Validar email único
+	// 📧 Validar email único
 	var exists int
 	err = infrastructure.DB.QueryRow(
 		"SELECT COUNT(*) FROM users WHERE email = @p1",
@@ -84,34 +80,66 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	).Scan(&exists)
 
 	if err != nil {
-		http.Error(w, "error checking email", 500)
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=CreateUser | email=%s | db_error=%v",
+			user.Email,
+			err,
+		)
+		http.Error(w, "error checking email", http.StatusInternalServerError)
 		return
 	}
 
 	if exists > 0 {
-		http.Error(w, "email already exists", 400)
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=CreateUser | email already exists | email=%s",
+			user.Email,
+		)
+		http.Error(w, "email already exists", http.StatusBadRequest)
 		return
 	}
 
-	// 3. Insertar en DB
+	// 🔐 Encriptar password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=CreateUser | email=%s | bcrypt_error=%v",
+			user.Email,
+			err,
+		)
+		http.Error(w, "error encrypting password", http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Insertar en DB
 	_, err = infrastructure.DB.Exec(
 		`INSERT INTO users 
 		(username, email, password, phone_number, birthday, address) 
 		VALUES (@p1, @p2, @p3, @p4, @p5, @p6)`,
 		user.UserName,
 		user.Email,
-		user.Password,
+		string(hashedPassword),
 		user.PhoneNumber,
 		user.Birthday,
 		user.Address,
 	)
 
 	if err != nil {
-		http.Error(w, "error creating user", 500)
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=CreateUser | email=%s | insert_error=%v",
+			user.Email,
+			err,
+		)
+		http.Error(w, "error creating user", http.StatusInternalServerError)
 		return
 	}
 
-	// 4. Respuesta JSON
+	// 🟢 Log de éxito
+	infrastructure.Logger.Printf(
+		"INFO | user created | email=%s",
+		user.Email,
+	)
+
+	// 5. Respuesta
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "user created successfully",

@@ -1,0 +1,231 @@
+basePath: /
+definitions:
+  controllers.DeleteRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  controllers.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  controllers.ResponseToken:
+    properties:
+      access_token:
+        type: string
+      message:
+        type: string
+    type: object
+  domain.User:
+    properties:
+      address:
+        type: string
+      birthday:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+      phone_number:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API REST para gestión de usuarios con JWT, bcrypt, validaciones, logging
+    y SQL Server.
+  title: User API Go
+  version: "2.0"
+paths:
+  /createUser:
+    post:
+      consumes:
+      - application/json
+      description: Crea un nuevo usuario con validaciones y contraseña encriptada
+      parameters:
+      - description: Datos del usuario
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/domain.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Crear usuario
+      tags:
+      - Users
+  /deleteUser:
+    delete:
+      consumes:
+      - application/json
+      description: Elimina un usuario por email. Requiere JWT.
+      parameters:
+      - description: Email del usuario
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.DeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Eliminar usuario
+      tags:
+      - Users
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Valida credenciales y devuelve un token JWT
+      parameters:
+      - description: Credenciales
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.ResponseToken'
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "429":
+          description: Too many requests
+          schema:
+            type: string
+      summary: Iniciar sesión
+      tags:
+      - Auth
+  /updateUser:
+    put:
+      consumes:
+      - application/json
+      description: Actualiza parcialmente un usuario. Requiere JWT.
+      parameters:
+      - description: Datos a actualizar
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/domain.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "404":
+          description: Not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Actualizar usuario
+      tags:
+      - Users
+  /uploadFile:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Sube un archivo al servidor
+      parameters:
+      - description: Archivo a subir
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Subir archivo
+      tags:
+      - Files
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

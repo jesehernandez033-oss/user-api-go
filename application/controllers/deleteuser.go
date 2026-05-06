@@ -6,45 +6,95 @@ import (
 	"net/http"
 )
 
+type DeleteRequest struct {
+	Email string `json:"email"`
+}
+
+// DeleteUser godoc
+// @Summary Eliminar usuario
+// @Description Elimina un usuario por email. Requiere JWT.
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body DeleteRequest true "Email del usuario"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string "Bad request"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 404 {string} string "Not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router /deleteUser [delete]
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
+	var req DeleteRequest
 
-	// 1. Obtener email desde query param
-	email := r.URL.Query().Get("email")
-
-	if email == "" {
-		http.Error(w, "email is required", 400)
+	// 1. Leer JSON
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=DeleteUser | error=invalid JSON | err=%v",
+			err,
+		)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// 2. Verificar si el usuario existe
+	if req.Email == "" {
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=DeleteUser | missing email",
+		)
+		http.Error(w, "email is required", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Verificar existencia
 	var exists int
-	err := infrastructure.DB.QueryRow(
+	err = infrastructure.DB.QueryRow(
 		"SELECT COUNT(*) FROM users WHERE email = @p1",
-		email,
+		req.Email,
 	).Scan(&exists)
 
 	if err != nil {
-		http.Error(w, "error checking user", 500)
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=DeleteUser | email=%s | db_error=%v",
+			req.Email,
+			err,
+		)
+		http.Error(w, "error checking user", http.StatusInternalServerError)
 		return
 	}
 
 	if exists == 0 {
-		http.Error(w, "user not found", 404)
+		infrastructure.Logger.Printf(
+			"WARNING | endpoint=DeleteUser | user not found | email=%s",
+			req.Email,
+		)
+		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
 
-	// 3. Eliminar usuario
+	// 3. Eliminar
 	_, err = infrastructure.DB.Exec(
 		"DELETE FROM users WHERE email = @p1",
-		email,
+		req.Email,
 	)
 
 	if err != nil {
-		http.Error(w, "error deleting user", 500)
+		infrastructure.Logger.Printf(
+			"ERROR | endpoint=DeleteUser | email=%s | delete_error=%v",
+			req.Email,
+			err,
+		)
+		http.Error(w, "error deleting user", http.StatusInternalServerError)
 		return
 	}
 
-	// 4. Respuesta JSON
+	// 🟢 Log de éxito
+	infrastructure.Logger.Printf(
+		"INFO | user deleted | email=%s",
+		req.Email,
+	)
+
+	// 4. Respuesta
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "user deleted successfully",
